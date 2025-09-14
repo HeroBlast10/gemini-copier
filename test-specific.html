@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Specific Issue Testing - Gemini LaTeX Copier</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-case {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-case h4 {
+            margin-top: 0;
+            color: #d32f2f;
+        }
+        .formula {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 18px;
+        }
+        .expected {
+            background: #e8f5e8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .result {
+            background: #fff3e0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        .test-button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Specific Issue Testing - Gemini LaTeX Copier</h1>
+    <p>This page tests the specific issues mentioned in the feedback.</p>
+    
+    <div class="test-case">
+        <h4>Issue 1: Taylor Series Formula</h4>
+        <p><strong>Problem:</strong> Outputs malformed text instead of proper LaTeX</p>
+        
+        <div class="formula">
+            $$e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots = \sum_{n=0}^{\infty} \frac{x^n}{n!}$$
+        </div>
+        
+        <div class="expected">
+            <strong>Expected LaTeX:</strong><br>
+            e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots = \sum_{n=0}^{\infty} \frac{x^n}{n!}
+        </div>
+        
+        <button class="test-button" onclick="testCopy(this, 1)">Test Copy</button>
+        <div class="result" id="result1">Click "Test Copy" and paste here (Ctrl+V)</div>
+    </div>
+    
+    <div class="test-case">
+        <h4>Issue 2: Theta Formula</h4>
+        <p><strong>Problem:</strong> Simple fraction not properly formatted</p>
+        
+        <div class="formula">
+            $$\theta(\text{rad}) = \frac{s}{r}$$
+        </div>
+        
+        <div class="expected">
+            <strong>Expected LaTeX:</strong><br>
+            \theta(\text{rad}) = \frac{s}{r}
+        </div>
+        
+        <button class="test-button" onclick="testCopy(this, 2)">Test Copy</button>
+        <div class="result" id="result2">Click "Test Copy" and paste here (Ctrl+V)</div>
+    </div>
+    
+    <div class="test-case">
+        <h4>Issue 3: Black-Scholes d1 Formula</h4>
+        <p><strong>Problem:</strong> Complex fraction with missing denominators</p>
+        
+        <div class="formula">
+            $$d_1 = \frac{\ln\left(\frac{S_t}{K}\right) + \left(r - q + \frac{\sigma^2}{2}\right)(T - t)}{\sigma\sqrt{T - t}}$$
+        </div>
+        
+        <div class="expected">
+            <strong>Expected LaTeX:</strong><br>
+            d_1 = \frac{\ln\left(\frac{S_t}{K}\right) + \left(r - q + \frac{\sigma^2}{2}\right)(T - t)}{\sigma\sqrt{T - t}}
+        </div>
+        
+        <button class="test-button" onclick="testCopy(this, 3)">Test Copy</button>
+        <div class="result" id="result3">Click "Test Copy" and paste here (Ctrl+V)</div>
+    </div>
+    
+    <div class="test-case">
+        <h4>Issue 4: Overlapping Selection Boxes</h4>
+        <p><strong>Problem:</strong> Multiple hover effects on the same formula</p>
+        
+        <div class="formula">
+            $$\int_0^\infty x^2 e^{-x} dx = 2$$
+        </div>
+        
+        <div class="expected">
+            <strong>Expected Behavior:</strong><br>
+            Only ONE hover effect should appear, no overlapping boxes
+        </div>
+        
+        <button class="test-button" onclick="testCopy(this, 4)">Test Copy</button>
+        <div class="result" id="result4">Hover over the formula above - should see only one selection box</div>
+    </div>
+    
+    <div class="test-case">
+        <h4>Manual Testing Area</h4>
+        <p>Create your own test formulas:</p>
+        
+        <textarea id="manual-latex" rows="3" cols="80" placeholder="Enter LaTeX here, e.g., \frac{a}{b} + x^2">
+\int_0^1 \frac{x^2}{\sqrt{1-x^2}} dx
+        </textarea><br>
+        <button class="test-button" onclick="renderManualFormula()">Render Formula</button>
+        <button class="test-button" onclick="clearManualFormula()">Clear</button>
+        
+        <div id="manual-formula" class="formula" style="min-height: 50px;"></div>
+        
+        <button class="test-button" onclick="testCopy(document.getElementById('manual-formula'), 'manual')">Test Copy Manual Formula</button>
+        <div class="result" id="resultmanual">Manual test result will appear here</div>
+    </div>
+    
+    <script>
+        function testCopy(button, testId) {
+            const formula = button.parentElement.querySelector('.formula');
+            if (!formula) return;
+            
+            // Simulate clicking on the formula
+            formula.click();
+            
+            // Give user time to paste
+            setTimeout(() => {
+                const resultDiv = document.getElementById('result' + testId);
+                resultDiv.innerHTML = 'Formula clicked! Please paste the result here (Ctrl+V)';
+                resultDiv.style.background = '#e3f2fd';
+                
+                // Focus the result div to make it easier to paste
+                resultDiv.contentEditable = true;
+                resultDiv.focus();
+            }, 100);
+        }
+        
+        function renderManualFormula() {
+            const latex = document.getElementById('manual-latex').value;
+            const formulaDiv = document.getElementById('manual-formula');
+            
+            if (latex.trim()) {
+                formulaDiv.innerHTML = `$$${latex}$$`;
+                
+                // Re-render MathJax
+                if (window.MathJax) {
+                    MathJax.typesetPromise([formulaDiv]);
+                }
+            }
+        }
+        
+        function clearManualFormula() {
+            document.getElementById('manual-formula').innerHTML = '';
+            document.getElementById('resultmanual').innerHTML = 'Manual test result will appear here';
+            document.getElementById('resultmanual').style.background = '#fff3e0';
+        }
+        
+        // Make result divs editable for pasting
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultDivs = document.querySelectorAll('.result');
+            resultDivs.forEach(div => {
+                div.contentEditable = true;
+                div.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const text = e.clipboardData.getData('text/plain');
+                    this.textContent = 'Pasted: ' + text;
+                    this.style.background = text.includes('\\') ? '#e8f5e8' : '#ffebee';
+                });
+            });
+        });
+        
+        // Add debugging information
+        setTimeout(() => {
+            console.log('🔍 Page loaded, checking for math elements...');
+            const mathElements = document.querySelectorAll('.MathJax, mjx-container, .katex, math');
+            console.log(`Found ${mathElements.length} math elements:`, mathElements);
+            
+            mathElements.forEach((el, i) => {
+                console.log(`Math element ${i + 1}:`, {
+                    tag: el.tagName,
+                    classes: el.className,
+                    text: el.textContent?.substring(0, 100),
+                    element: el
+                });
+            });
+        }, 2000);
+    </script>
+</body>
+</html>

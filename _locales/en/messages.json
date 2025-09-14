@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Universal Math Formula Copier",
+    "description": "The name of the extension."
+  },
+  "extensionDescription": {
+    "message": "Automatically detect and copy mathematical formulas from any website (Gemini, ChatGPT, Claude, etc.) in LaTeX format with double-click",
+    "description": "The description of the extension."
+  }
+}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gemini LaTeX Copier - Test Page</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        .math-example {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gemini LaTeX Copier - Test Page</h1>
+    <p>This page contains various mathematical expressions to test the extension's detection and copying capabilities.</p>
+    
+    <div class="test-section">
+        <h3>Inline Math (MathJax)</h3>
+        <div class="math-example">
+            The quadratic formula is $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$ and it's very useful.
+        </div>
+        <div class="math-example">
+            Einstein's famous equation: $E = mc^2$
+        </div>
+        <div class="math-example">
+            The derivative of $x^n$ is $nx^{n-1}$.
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Display Math (MathJax)</h3>
+        <div class="math-example">
+            $$\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$
+        </div>
+        <div class="math-example">
+            $$\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}$$
+        </div>
+        <div class="math-example">
+            $$\lim_{x \to 0} \frac{\sin x}{x} = 1$$
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Complex Expressions</h3>
+        <div class="math-example">
+            $$\begin{pmatrix} a & b \\ c & d \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix} = \begin{pmatrix} ax + by \\ cx + dy \end{pmatrix}$$
+        </div>
+        <div class="math-example">
+            $$f(x) = \begin{cases}
+            x^2 & \text{if } x \geq 0 \\
+            -x^2 & \text{if } x < 0
+            \end{cases}$$
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>Fractions and Complex Formulas</h3>
+        <div class="math-example">
+            $$d_1 = \frac{\ln\left(\frac{S_t}{K}\right) + \left(r - q + \frac{\sigma^2}{2}\right)(T - t)}{\sigma\sqrt{T - t}}$$
+        </div>
+        <div class="math-example">
+            $$\int_0^\infty \frac{x^2 e^{-x}}{1 + x^2} dx$$
+        </div>
+        <div class="math-example">
+            $$\lim_{n \to \infty} \left(1 + \frac{1}{n}\right)^n = e$$
+        </div>
+        <div class="math-example">
+            $$\sum_{k=0}^n \binom{n}{k} x^k y^{n-k} = (x + y)^n$$
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Greek Letters and Symbols</h3>
+        <div class="math-example">
+            $\alpha + \beta = \gamma$, $\Delta x \to 0$, $\Sigma_{i=1}^n x_i$
+        </div>
+        <div class="math-example">
+            $$\nabla \cdot \mathbf{F} = \frac{\partial F_x}{\partial x} + \frac{\partial F_y}{\partial y} + \frac{\partial F_z}{\partial z}$$
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Text with LaTeX Delimiters (for fallback testing)</h3>
+        <div class="math-example">
+            <span data-latex="x^2 + y^2 = r^2">$$x^2 + y^2 = r^2$$</span>
+        </div>
+        <div class="math-example">
+            <span data-latex="\frac{d}{dx}[f(x)] = f'(x)">\(\frac{d}{dx}[f(x)] = f'(x)\)</span>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Debug Information</h3>
+        <div class="math-example">
+            <p>Click the button below to inspect the DOM structure of rendered math:</p>
+            <button onclick="debugMathElements()">Debug Math Elements</button>
+            <div id="debug-output" style="margin-top: 10px; padding: 10px; background: #f0f0f0; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>Instructions</h3>
+        <ol>
+            <li>Install the Gemini LaTeX Copier extension</li>
+            <li>Refresh this page</li>
+            <li>Try clicking on the mathematical expressions above</li>
+            <li>Check that the LaTeX code is copied to your clipboard</li>
+            <li>Paste the result to verify it's clean LaTeX</li>
+            <li>Use the debug button to inspect how math is rendered</li>
+        </ol>
+        <p><strong>Expected behavior:</strong> Clicking on any math expression should copy clean LaTeX code without delimiters.</p>
+    </div>
+    
+    <script>
+        // Debug function to inspect math elements
+        function debugMathElements() {
+            const output = document.getElementById('debug-output');
+            output.innerHTML = '';
+
+            const mathElements = document.querySelectorAll('.MathJax, mjx-container, .katex, math');
+
+            if (mathElements.length === 0) {
+                output.innerHTML = 'No math elements found. Make sure MathJax has finished rendering.';
+                return;
+            }
+
+            mathElements.forEach((el, index) => {
+                const info = document.createElement('div');
+                info.style.marginBottom = '10px';
+                info.style.borderBottom = '1px solid #ccc';
+                info.style.paddingBottom = '5px';
+
+                info.innerHTML = `
+                    <strong>Element ${index + 1}:</strong><br>
+                    Tag: ${el.tagName}<br>
+                    Classes: ${el.className}<br>
+                    Text: ${el.textContent.substring(0, 100)}...<br>
+                    HTML: ${el.outerHTML.substring(0, 200)}...
+                `;
+
+                output.appendChild(info);
+            });
+        }
+
+        // Add some dynamic math content to test the mutation observer
+        setTimeout(() => {
+            const dynamicSection = document.createElement('div');
+            dynamicSection.className = 'test-section';
+            dynamicSection.innerHTML = `
+                <h3>Dynamic Content (Added after 2 seconds)</h3>
+                <div class="math-example">
+                    $$\\lim_{n \\to \\infty} \\left(1 + \\frac{1}{n}\\right)^n = e$$
+                </div>
+            `;
+            document.body.appendChild(dynamicSection);
+
+            // Re-render MathJax for new content
+            if (window.MathJax) {
+                MathJax.typesetPromise([dynamicSection]);
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
