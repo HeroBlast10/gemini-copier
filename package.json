@@ -8,6 +8,7 @@
     "clean": "rm -rf dist",
     "zip": "npm run build && npm run zip:all",
     "zip:all": "cd dist && zip -r chrome.zip chrome/ && zip -r firefox.zip firefox/ && zip -r edge.zip edge/ && zip -r safari.zip safari/",
+    "release": "node release.js",
     "test": "echo \"No tests specified\" && exit 0"
   },
   "repository": {
