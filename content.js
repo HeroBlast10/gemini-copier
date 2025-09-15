@@ -945,17 +945,193 @@ function extractDeepSeekLatex(element, text) {
     return null;
 }
 
-// Enhanced simple LaTeX detection (DeepSeekFormulaCopy approach + additional patterns)
+// Universal mathematical structure reconstruction (inspired by DeepSeekFormulaCopy)
+function universalMathReconstruction(text, element) {
+    if (!text || text.length > 500) return null;
+
+    console.log('🔧 Universal math reconstruction for:', text.substring(0, 100));
+
+    // Clean zero-width characters first
+    let cleanText = text.replace(/​/g, '').replace(/\u200B/g, '');
+
+    // 1. Detect and reconstruct fractions from DOM structure
+    const fractionResult = reconstructFractionsFromDOM(element, cleanText);
+    if (fractionResult) {
+        console.log('✅ Reconstructed fraction:', fractionResult);
+        return fractionResult;
+    }
+
+    // 2. Detect and reconstruct superscripts/subscripts from DOM structure
+    const scriptResult = reconstructScriptsFromDOM(element, cleanText);
+    if (scriptResult) {
+        console.log('✅ Reconstructed scripts:', scriptResult);
+        return scriptResult;
+    }
+
+    // 3. Detect and reconstruct square roots from DOM structure
+    const sqrtResult = reconstructSqrtFromDOM(element, cleanText);
+    if (sqrtResult) {
+        console.log('✅ Reconstructed sqrt:', sqrtResult);
+        return sqrtResult;
+    }
+
+    // 4. General mathematical pattern reconstruction
+    const generalResult = reconstructGeneralMathPattern(cleanText);
+    if (generalResult && generalResult !== cleanText) {
+        console.log('✅ General reconstruction:', generalResult);
+        return generalResult;
+    }
+
+    return null;
+}
+
+// Reconstruct fractions by analyzing DOM structure
+function reconstructFractionsFromDOM(element, text) {
+    // Look for fraction structure in DOM
+    const fractionElements = element.querySelectorAll('.mfrac, .frac');
+    if (fractionElements.length > 0) {
+        let result = text;
+
+        fractionElements.forEach(fracEl => {
+            const numerator = fracEl.querySelector('.vlist-r .vlist span:last-child .mord, .numerator');
+            const denominator = fracEl.querySelector('.vlist-r .vlist span:first-child .mord, .denominator');
+
+            if (numerator && denominator) {
+                const numText = numerator.textContent.trim();
+                const denText = denominator.textContent.trim();
+
+                // Replace the fraction text with LaTeX
+                const fracPattern = new RegExp(`${numText}.*?${denText}`, 'g');
+                result = result.replace(fracPattern, `\\frac{${numText}}{${denText}}`);
+            }
+        });
+
+        if (result !== text) return result;
+    }
+
+    // Fallback: detect fraction patterns in text
+    // Pattern: P(B)P(B∣A)P(A)​ -> \frac{P(B|A)P(A)}{P(B)}
+    if (text.includes('P(') && text.includes('∣') && text.includes(')P(')) {
+        const match = text.match(/P\(([^)]+)∣([^)]+)\).*?P\(([^)]+)\)P\(([^)]+)\).*?P\(([^)]+)\)/);
+        if (match) {
+            return `P(${match[1]}|${match[2]}) = \\frac{P(${match[2]}|${match[1]})P(${match[1]})}{P(${match[2]})}`;
+        }
+    }
+
+    return null;
+}
+
+// Reconstruct superscripts and subscripts from DOM structure
+function reconstructScriptsFromDOM(element, text) {
+    let result = text;
+    let hasChanges = false;
+
+    // Find superscript elements
+    const supElements = element.querySelectorAll('.msupsub .vlist-r .vlist span[style*="top: -3"], .msup, .superscript');
+    supElements.forEach(supEl => {
+        const base = supEl.closest('.mord')?.querySelector('.mord:first-child')?.textContent;
+        const sup = supEl.textContent.trim();
+
+        if (base && sup && base !== sup) {
+            // Replace patterns like "a2" with "a^{2}"
+            const pattern = new RegExp(`${base}${sup}(?![a-zA-Z])`, 'g');
+            const replacement = `${base}^{${sup}}`;
+            if (result.includes(`${base}${sup}`)) {
+                result = result.replace(pattern, replacement);
+                hasChanges = true;
+            }
+        }
+    });
+
+    // Find subscript elements
+    const subElements = element.querySelectorAll('.msupsub .vlist-r .vlist span[style*="top: -2"], .msub, .subscript');
+    subElements.forEach(subEl => {
+        const base = subEl.closest('.mord')?.querySelector('.mord:first-child')?.textContent;
+        const sub = subEl.textContent.trim();
+
+        if (base && sub && base !== sub) {
+            // Replace patterns like "Fn" with "F_{n}"
+            const pattern = new RegExp(`${base}${sub}(?![a-zA-Z])`, 'g');
+            const replacement = `${base}_{${sub}}`;
+            if (result.includes(`${base}${sub}`)) {
+                result = result.replace(pattern, replacement);
+                hasChanges = true;
+            }
+        }
+    });
+
+    return hasChanges ? result : null;
+}
+
+// Reconstruct square roots from DOM structure
+function reconstructSqrtFromDOM(element, text) {
+    const sqrtElements = element.querySelectorAll('.sqrt, .mord.sqrt');
+    if (sqrtElements.length > 0) {
+        let result = text;
+
+        sqrtElements.forEach(sqrtEl => {
+            const content = sqrtEl.querySelector('.mord')?.textContent?.trim();
+            if (content) {
+                // Replace the content with LaTeX sqrt
+                result = result.replace(content, `\\sqrt{${content}}`);
+            }
+        });
+
+        if (result !== text) return result;
+    }
+
+    return null;
+}
+
+// General mathematical pattern reconstruction
+function reconstructGeneralMathPattern(text) {
+    let result = text;
+
+    // Fix common patterns
+    // 1. Simple superscripts: ax2 -> ax^2
+    result = result.replace(/([a-zA-Z])([0-9]+)(?![a-zA-Z])/g, '$1^{$2}');
+
+    // 2. Simple subscripts with Greek letters: Fn -> F_n
+    result = result.replace(/([A-Z])([a-z])(?![a-zA-Z])/g, '$1_{$2}');
+
+    // 3. Conditional probability: ∣ -> |
+    result = result.replace(/∣/g, '|');
+
+    // 4. Fix spacing around operators
+    result = result.replace(/([a-zA-Z0-9}])([=+\-])/g, '$1 $2 ');
+    result = result.replace(/([=+\-])([a-zA-Z0-9{])/g, '$1 $2');
+
+    // 5. Clean up multiple spaces
+    result = result.replace(/\s+/g, ' ').trim();
+
+    return result;
+}
+
+// Enhanced simple LaTeX detection (DeepSeekFormulaCopy approach + intelligent normalization)
 function simpleLatexDetection(element) {
     const text = element.textContent || '';
     if (!text || text.length > 500) return null;
 
     console.log('🔧 Enhanced LaTeX detection for:', text.substring(0, 100));
 
+    // Priority 0: Universal mathematical structure reconstruction (NEW)
+    const universalResult = universalMathReconstruction(text, element);
+    if (universalResult) {
+        console.log('✅ Universal reconstruction result:', universalResult);
+        return universalResult;
+    }
+
     // Priority 1: Already formatted LaTeX (DeepSeekFormulaCopy approach)
     if (text.includes('\\') && (text.includes('frac') || text.includes('sum') || text.includes('int'))) {
         console.log('✅ Found LaTeX-like content:', text);
         return text.trim();
+    }
+
+    // Priority 1.5: Intelligent mathematical expression normalization
+    const normalizedLatex = normalizeMathExpression(text);
+    if (normalizedLatex && normalizedLatex !== text) {
+        console.log('✅ Normalized mathematical expression:', normalizedLatex);
+        return normalizedLatex;
     }
 
     // Priority 2: Enhanced mathematical patterns (inspired by DeepSeekFormulaCopy)
