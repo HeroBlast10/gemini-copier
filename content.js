@@ -2009,9 +2009,38 @@ function addCopyFunctionalityToMath() {
     console.log('🌐 Current URL:', window.location.href);
 
     const hostname = window.location.hostname;
+
+    // Only run on supported AI platforms (DeepSeekFormulaCopy approach)
+    const supportedPlatforms = [
+        'gemini.google.com',
+        'chat.openai.com', 'chatgpt.com',
+        'chat.deepseek.com',
+        'claude.ai',
+        'kimi.ai', 'kimi.moonshot.cn'
+    ];
+
+    const isSupported = supportedPlatforms.some(platform => hostname.includes(platform));
+    if (!isSupported) {
+        console.log('❌ Platform not supported, skipping math detection');
+        return;
+    }
+
+    // Set platform identifier for CSS targeting (DeepSeekFormulaCopy approach)
+    let platformId = '';
+    if (hostname.includes('gemini.google.com')) platformId = 'gemini';
+    else if (hostname.includes('chat.openai.com') || hostname.includes('chatgpt.com')) platformId = 'chatgpt';
+    else if (hostname.includes('chat.deepseek.com')) platformId = 'deepseek';
+    else if (hostname.includes('claude.ai')) platformId = 'claude';
+    else if (hostname.includes('kimi.ai') || hostname.includes('kimi.moonshot.cn')) platformId = 'kimi';
+
+    if (platformId) {
+        document.body.setAttribute('data-platform', platformId);
+        console.log(`✅ Platform identified: ${platformId}`);
+    }
+
     let mathSelectors = [];
 
-    // Platform-specific selectors
+    // Platform-specific selectors (precise targeting like DeepSeekFormulaCopy)
     if (hostname.includes('gemini.google.com')) {
         // Gemini-specific selectors based on HTML structure analysis
         mathSelectors = [
@@ -2019,33 +2048,33 @@ function addCopyFunctionalityToMath() {
             '.katex', '.katex-html',        // KaTeX elements
             '.katex-display'                // Display math
         ];
-    } else {
-        // Enhanced selectors for other platforms (DeepSeekFormulaCopy approach + extensions)
+    } else if (hostname.includes('chat.deepseek.com')) {
+        // DeepSeek selectors (from DeepSeekFormulaCopy)
         mathSelectors = [
-            // KaTeX elements (primary target - DeepSeekFormulaCopy core)
-            '.katex', '.katex-html', '.katex-display', '.katex-inline', '.katex-mathml',
-            // MathJax elements (comprehensive coverage)
-            '.MathJax', '.mjx-container', '.mjx-chtml', '.MathJax_Display', 'mjx-math',
-            '.mjx-assistive-mml', '.mjx-mrow', '.mjx-math',
-            // Generic math elements
-            'math', '.math', '.formula', '.equation', '.math-expression',
-            // Elements with LaTeX data attributes (DeepSeekFormulaCopy approach)
-            '[data-latex]', '[data-math]', '[data-katex]', '[data-mathjax]',
-            '[data-tex]', '[data-formula]', '[data-equation]', '[data-math-content]',
-            // Platform-specific (DeepSeekFormulaCopy mentions .ds-math)
-            '.ds-math', '.formula-box', '.math-container', '.latex-container',
-            // Additional AI platform selectors
-            '.math-block', '.math-inline', '.latex-block', '.latex-inline',
-            // Kimi.ai specific
-            '.latex-source', '[data-math]',
-            // Claude specific
-            '.math-display', '.inline-math',
-            // ChatGPT specific
-            '.math-tex', '.katex-display-wrapper',
-            // DeepSeek specific (from DeepSeekFormulaCopy)
-            'katex-html', // Note: DeepSeekFormulaCopy uses this without dot
-            // Generic containers that might contain math
-            '.formula-wrapper', '.equation-wrapper', '.math-wrapper'
+            '.katex', '.ds-math', '.formula-box', 'katex-html'
+        ];
+    } else if (hostname.includes('chat.openai.com') || hostname.includes('chatgpt.com')) {
+        // ChatGPT selectors
+        mathSelectors = [
+            '.katex', '.katex-html', '.katex-display', '.katex-mathml',
+            '.MathJax', '.mjx-container', '.mjx-chtml'
+        ];
+    } else if (hostname.includes('claude.ai')) {
+        // Claude selectors
+        mathSelectors = [
+            '.katex', '.katex-html', '.katex-display',
+            'math', '.math-display', '.inline-math'
+        ];
+    } else if (hostname.includes('kimi.ai') || hostname.includes('kimi.moonshot.cn')) {
+        // Kimi selectors
+        mathSelectors = [
+            '.katex', '.latex-source', '[data-math]', '[data-latex]'
+        ];
+    } else {
+        // Fallback for other supported platforms
+        mathSelectors = [
+            '.katex', '.katex-html', '.katex-display', '.katex-mathml',
+            '[data-latex]', '[data-math]', '[data-katex]'
         ];
     }
 
@@ -2312,9 +2341,10 @@ function scanTextNodesForMath() {
     });
 }
 
-// Add double-click handler to math element (inspired by DeepSeekFormulaCopy)
+// Add double-click handler to math element (DeepSeekFormulaCopy approach)
 function addDoubleClickHandler(element) {
-    // Minimal styling - only set cursor (no title for cleaner interface)
+    // DeepSeekFormulaCopy approach: minimal styling, no hover effects
+    // Only set cursor to indicate clickability
     element.style.cursor = 'pointer';
 
     console.log('✅ Added double-click handler to element:', element);
