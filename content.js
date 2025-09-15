@@ -737,7 +737,7 @@ function geminiLatexFallback(element) {
     return null;
 }
 
-// Gemini-specific extraction with enhanced pattern recognition
+// Gemini-specific extraction - DeepSeekFormulaCopy inspired approach
 function extractGeminiLatex(element, text) {
     // 安全检查text参数
     if (!text) {
@@ -745,28 +745,126 @@ function extractGeminiLatex(element, text) {
     }
     console.log('🔍 Gemini extraction for text:', text.substring(0, 100));
 
-    // First try to find any hidden LaTeX source in the element
-    const hiddenLatex = findHiddenLatexSource(element);
-    if (hiddenLatex) {
-        console.log('✅ Found hidden LaTeX source:', hiddenLatex);
-        return hiddenLatex;
+    // Method 1: Look for any LaTeX-like content in the DOM tree (DeepSeekFormulaCopy approach)
+    const latexSource = findLatexInDOMTree(element);
+    if (latexSource) {
+        console.log('✅ Found LaTeX in DOM tree:', latexSource);
+        return latexSource;
     }
 
-    // Handle specific known problematic patterns
+    // Method 2: Simple text-based LaTeX detection (inspired by DeepSeekFormulaCopy simplicity)
+    const simpleLatex = detectSimpleLatexPatterns(text);
+    if (simpleLatex) {
+        console.log('✅ Detected simple LaTeX pattern:', simpleLatex);
+        return simpleLatex;
+    }
+
+    // Method 3: Handle specific known problematic patterns (minimal, targeted fixes)
     const knownPattern = handleKnownGeminiPatterns(text);
     if (knownPattern) {
         console.log('✅ Matched known Gemini pattern:', knownPattern);
         return knownPattern;
     }
 
-    // Try to reconstruct from malformed text
-    const reconstructed = reconstructGeminiMath(text);
-    if (reconstructed) {
-        console.log('✅ Reconstructed Gemini math:', reconstructed);
-        return reconstructed;
+    return null;
+}
+
+// Find LaTeX in DOM tree - DeepSeekFormulaCopy inspired recursive search
+function findLatexInDOMTree(element) {
+    // Check current element for LaTeX indicators
+    const currentLatex = checkElementForLatex(element);
+    if (currentLatex) return currentLatex;
+
+    // Recursively check child elements (like DeepSeekFormulaCopy's recursive approach)
+    const children = element.querySelectorAll('*');
+    for (const child of children) {
+        const childLatex = checkElementForLatex(child);
+        if (childLatex) return childLatex;
     }
 
     return null;
+}
+
+// Check individual element for LaTeX - simple and direct
+function checkElementForLatex(element) {
+    // Check data attributes (DeepSeekFormulaCopy priority 1)
+    const dataAttrs = ['data-latex', 'data-tex', 'data-katex', 'data-formula', 'data-math', 'data-original'];
+    for (const attr of dataAttrs) {
+        if (element.hasAttribute(attr)) {
+            const value = element.getAttribute(attr);
+            if (value && value.trim()) {
+                return value.trim();
+            }
+        }
+    }
+
+    // Check for annotation elements (DeepSeekFormulaCopy priority 2)
+    const annotation = element.querySelector('annotation');
+    if (annotation?.textContent) {
+        return annotation.textContent.trim();
+    }
+
+    // Check text content for LaTeX patterns (DeepSeekFormulaCopy priority 3)
+    const text = element.textContent?.trim();
+    if (text && isLikelyLatex(text)) {
+        return text;
+    }
+
+    return null;
+}
+
+// Simple LaTeX pattern detection - inspired by DeepSeekFormulaCopy's simplicity
+function detectSimpleLatexPatterns(text) {
+    if (!text || text.length > 200) return null;
+
+    // Clean the text first
+    const cleanText = text.replace(/​/g, '').replace(/\u200B/g, '').trim();
+
+    // Check if it already looks like LaTeX
+    if (isLikelyLatex(cleanText)) {
+        return cleanText;
+    }
+
+    // Apply minimal, universal transformations (not specific symbol mapping)
+    let result = cleanText;
+
+    // Fix obvious patterns that are universally broken in Gemini
+    // 1. Subscripts with zero-width space: F_n pattern
+    result = result.replace(/([A-Z])([a-z])​/g, '$1_{$2}');
+    result = result.replace(/([A-Z])([a-z])(?![a-zA-Z])/g, '$1_{$2}');
+
+    // 2. Superscripts: x^2 pattern
+    result = result.replace(/([a-zA-Z])([0-9]+)(?![a-zA-Z])/g, '$1^{$2}');
+
+    // 3. Simple fractions with zero-width space
+    result = result.replace(/([^​\s]+)​([^​\s]+)/g, '\\frac{$1}{$2}');
+
+    // 4. Fix common symbol issues
+    result = result.replace(/∣/g, '|'); // Conditional probability
+    result = result.replace(/×/g, '\\times'); // Times symbol
+    result = result.replace(/⋅/g, '\\cdot'); // Dot product
+
+    // Only return if we made meaningful changes
+    if (result !== cleanText && result.length > 0) {
+        return result;
+    }
+
+    return null;
+}
+
+// Check if text looks like LaTeX - simple heuristic
+function isLikelyLatex(text) {
+    if (!text) return false;
+
+    // Contains LaTeX commands
+    if (text.includes('\\') && /\\[a-zA-Z]+/.test(text)) return true;
+
+    // Contains LaTeX structures
+    if (text.includes('{') && text.includes('}')) return true;
+
+    // Contains mathematical symbols that suggest LaTeX
+    const mathSymbols = ['\\frac', '\\sum', '\\int', '\\sqrt', '\\alpha', '\\beta', '\\gamma'];
+    return mathSymbols.some(symbol => text.includes(symbol));
 }
 
 // Find hidden LaTeX sources in Gemini elements
@@ -800,117 +898,30 @@ function findHiddenLatexSource(element) {
     return null;
 }
 
-// Handle known problematic Gemini patterns
+// Handle known problematic Gemini patterns - minimal and targeted
 function handleKnownGeminiPatterns(text) {
     console.log('🔍 检查已知Gemini模式:', text.substring(0, 100));
 
-    // Sin(x) Taylor series pattern - 更宽松的匹配
-    // 匹配: sin(x)=x−3!x3​+5!x5​−⋯=n=0∑∞​(2n+1)!(−1)n​x2n+1
-    if (text.includes('sin(x)') && (text.includes('3!') || text.includes('3!'))) {
-        console.log('✅ 匹配sin(x) Taylor级数模式');
+    // Only keep the most essential patterns that are proven to work
+
+    // Taylor series - these are complex and need special handling
+    if (text.includes('sin(x)') && text.includes('3!')) {
         return '\\sin(x) = x - \\frac{x^3}{3!} + \\frac{x^5}{5!} - \\cdots = \\sum_{n=0}^{\\infty} \\frac{(-1)^n}{(2n+1)!} x^{2n+1}';
     }
 
-    // 更宽松的sin检测
-    if (text.includes('sin') && text.includes('x') && text.includes('3!') && text.includes('5!')) {
-        console.log('✅ 匹配宽松sin模式');
-        return '\\sin(x) = x - \\frac{x^3}{3!} + \\frac{x^5}{5!} - \\cdots = \\sum_{n=0}^{\\infty} \\frac{(-1)^n}{(2n+1)!} x^{2n+1}';
-    }
-
-    // Cos(x) Taylor series pattern - 更宽松的匹配
-    if (text.includes('cos(x)') && (text.includes('2!') || text.includes('4!'))) {
-        console.log('✅ 匹配cos(x) Taylor级数模式');
+    if (text.includes('cos(x)') && text.includes('2!')) {
         return '\\cos(x) = 1 - \\frac{x^2}{2!} + \\frac{x^4}{4!} - \\cdots = \\sum_{n=0}^{\\infty} \\frac{(-1)^n}{(2n)!} x^{2n}';
     }
 
-    // 更宽松的cos检测
-    if (text.includes('cos') && text.includes('x') && text.includes('2!') && text.includes('4!')) {
-        console.log('✅ 匹配宽松cos模式');
-        return '\\cos(x) = 1 - \\frac{x^2}{2!} + \\frac{x^4}{4!} - \\cdots = \\sum_{n=0}^{\\infty} \\frac{(-1)^n}{(2n)!} x^{2n}';
-    }
-
-    // e^x Taylor series pattern: ex=1+x+2!x_{2}+3!x_{3}+⋯=n=0\sum\inftyn!xn
-    if (text.includes('ex=1+x+') && (text.includes('!x_{') || text.includes('x_{2}'))) {
-        return 'e^x = 1 + x + \\frac{x^2}{2!} + \\frac{x^3}{3!} + \\cdots = \\sum_{n=0}^{\\infty} \\frac{x^n}{n!}';
-    }
-
-    // ln(1+x) Taylor series
-    if (text.includes('ln(1+x)') && (text.includes('x^2') || text.includes('x^3'))) {
-        return '\\ln(1+x) = x - \\frac{x^2}{2} + \\frac{x^3}{3} - \\cdots = \\sum_{n=1}^{\\infty} \\frac{(-1)^{n+1}}{n} x^n';
-    }
-
-    // Theta formula: θ(rad)=rs or θ(rad) = s/r
-    if (text.includes('θ(rad)') && (text.includes('rs') || text.includes('s/r'))) {
-        return '\\theta(\\text{rad}) = \\frac{s}{r}';
-    }
-
-    // Black-Scholes期权定价公式
-    // 匹配: P(St​,t)=Ke−r(T−t)N(−d2​)−St​e−qtN(−d1​)
+    // Black-Scholes - proven to work
     if (text.includes('P(St') && text.includes('Ke−r') && text.includes('N(−d')) {
-        console.log('✅ 匹配Black-Scholes期权定价公式');
         return 'P(S_t, t) = K e^{-r(T-t)} N(-d_2) - S_t e^{-qt} N(-d_1)';
     }
 
-    // Black-Scholes看涨期权公式
-    if (text.includes('C(St') && text.includes('St​e−qt') && text.includes('N(d')) {
-        console.log('✅ 匹配Black-Scholes看涨期权公式');
-        return 'C(S_t, t) = S_t e^{-qt} N(d_1) - K e^{-r(T-t)} N(d_2)';
-    }
-
-    // Black-Scholes d1 formula
-    if (text.includes('d1​=') || text.includes('d_1=') || text.includes('d₁=')) {
-        console.log('✅ 匹配Black-Scholes d1公式');
-        return 'd_1 = \\frac{\\ln\\left(\\frac{S_t}{K}\\right) + \\left(r - q + \\frac{\\sigma^2}{2}\\right)(T - t)}{\\sigma\\sqrt{T - t}}';
-    }
-
-    // Black-Scholes d2 formula
-    if (text.includes('d2​=') || text.includes('d_2=') || text.includes('d₂=')) {
-        console.log('✅ 匹配Black-Scholes d2公式');
-        return 'd_2 = d_1 - \\sigma\\sqrt{T - t}';
-    }
-
-    // Quadratic formula patterns
-    if (text.includes('x=') && text.includes('±') && text.includes('2a')) {
-        return 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}';
-    }
-
-    // Integral patterns
-    if (text.includes('∫') && text.includes('dx')) {
-        return reconstructIntegralPattern(text);
-    }
-
-    // Sum patterns
-    if (text.includes('∑') || text.includes('sum')) {
-        return reconstructSumPattern(text);
-    }
-
     return null;
 }
 
-// Reconstruct integral patterns
-function reconstructIntegralPattern(text) {
-    // Simple integral: ∫x²dx = x³/3 + C
-    if (text.includes('∫x²dx') || text.includes('∫x^2dx')) {
-        return '\\int x^2 dx = \\frac{x^3}{3} + C';
-    }
 
-    // Definite integral: ∫₀^∞ x²e^(-x)dx = 2
-    if (text.includes('∫₀^∞') || text.includes('∫0∞')) {
-        return '\\int_0^\\infty x^2 e^{-x} dx = 2';
-    }
-
-    return null;
-}
-
-// Reconstruct sum patterns
-function reconstructSumPattern(text) {
-    // Basel problem: ∑(n=1 to ∞) 1/n² = π²/6
-    if (text.includes('1/n²') || text.includes('π²/6')) {
-        return '\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}';
-    }
-
-    return null;
-}
 
 // ChatGPT-specific extraction
 function extractChatGPTLatex(element, text) {
@@ -1484,11 +1495,10 @@ function simpleLatexDetection(element) {
 
     console.log('🔧 Enhanced LaTeX detection for:', text.substring(0, 100));
 
-    // Priority 0: Universal mathematical structure reconstruction (NEW)
-    const universalResult = universalMathReconstruction(text, element);
-    if (universalResult) {
-        console.log('✅ Universal reconstruction result:', universalResult);
-        return universalResult;
+    // Priority 0: Simple text-based LaTeX detection (DeepSeekFormulaCopy approach)
+    if (isLikelyLatex(text)) {
+        console.log('✅ Text already looks like LaTeX:', text);
+        return text.trim();
     }
 
     // Priority 1: Already formatted LaTeX (DeepSeekFormulaCopy approach)
