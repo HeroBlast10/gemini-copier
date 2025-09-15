@@ -975,7 +975,14 @@ function universalMathReconstruction(text, element) {
         return sqrtResult;
     }
 
-    // 4. General mathematical pattern reconstruction
+    // 4. Detect and reconstruct integrals and summations
+    const integralResult = reconstructIntegralsAndSums(element, cleanText);
+    if (integralResult) {
+        console.log('✅ Reconstructed integrals/sums:', integralResult);
+        return integralResult;
+    }
+
+    // 5. General mathematical pattern reconstruction
     const generalResult = reconstructGeneralMathPattern(cleanText);
     if (generalResult && generalResult !== cleanText) {
         console.log('✅ General reconstruction:', generalResult);
@@ -985,40 +992,216 @@ function universalMathReconstruction(text, element) {
     return null;
 }
 
-// Reconstruct fractions by analyzing DOM structure
+// Enhanced fraction reconstruction with better DOM analysis
 function reconstructFractionsFromDOM(element, text) {
-    // Look for fraction structure in DOM
+    console.log('🔧 Fraction reconstruction for:', text.substring(0, 50));
+
+    // Method 1: Analyze KaTeX fraction DOM structure
     const fractionElements = element.querySelectorAll('.mfrac, .frac');
     if (fractionElements.length > 0) {
         let result = text;
+        let hasChanges = false;
 
         fractionElements.forEach(fracEl => {
-            const numerator = fracEl.querySelector('.vlist-r .vlist span:last-child .mord, .numerator');
-            const denominator = fracEl.querySelector('.vlist-r .vlist span:first-child .mord, .denominator');
+            // Try multiple selectors for numerator and denominator
+            const numeratorSelectors = [
+                '.vlist-r .vlist span:last-child .mord',
+                '.vlist-r .vlist span:last-child',
+                '.numerator',
+                '.frac-line + span'
+            ];
+
+            const denominatorSelectors = [
+                '.vlist-r .vlist span:first-child .mord',
+                '.vlist-r .vlist span:first-child',
+                '.denominator',
+                '.frac-line - span'
+            ];
+
+            let numerator = null, denominator = null;
+
+            // Find numerator
+            for (const selector of numeratorSelectors) {
+                numerator = fracEl.querySelector(selector);
+                if (numerator) break;
+            }
+
+            // Find denominator
+            for (const selector of denominatorSelectors) {
+                denominator = fracEl.querySelector(selector);
+                if (denominator) break;
+            }
 
             if (numerator && denominator) {
-                const numText = numerator.textContent.trim();
-                const denText = denominator.textContent.trim();
+                const numText = cleanMathText(numerator.textContent);
+                const denText = cleanMathText(denominator.textContent);
 
-                // Replace the fraction text with LaTeX
-                const fracPattern = new RegExp(`${numText}.*?${denText}`, 'g');
-                result = result.replace(fracPattern, `\\frac{${numText}}{${denText}}`);
+                if (numText && denText) {
+                    console.log(`Found fraction: ${numText} / ${denText}`);
+                    // Create a more flexible replacement pattern
+                    const fracPattern = createFlexibleFractionPattern(numText, denText, text);
+                    if (fracPattern) {
+                        result = result.replace(fracPattern, `\\frac{${numText}}{${denText}}`);
+                        hasChanges = true;
+                    }
+                }
             }
         });
 
-        if (result !== text) return result;
+        if (hasChanges) return result;
     }
 
-    // Fallback: detect fraction patterns in text
-    // Pattern: P(B)P(B∣A)P(A)​ -> \frac{P(B|A)P(A)}{P(B)}
-    if (text.includes('P(') && text.includes('∣') && text.includes(')P(')) {
-        const match = text.match(/P\(([^)]+)∣([^)]+)\).*?P\(([^)]+)\)P\(([^)]+)\).*?P\(([^)]+)\)/);
-        if (match) {
-            return `P(${match[1]}|${match[2]}) = \\frac{P(${match[2]}|${match[1]})P(${match[1]})}{P(${match[2]})}`;
+    // Method 2: Pattern-based fraction detection
+    const fractionPatterns = [
+        // Bayes theorem: P(B)P(B∣A)P(A)​ -> \frac{P(B|A)P(A)}{P(B)}
+        {
+            pattern: /P\(([^)]+)∣([^)]+)\).*?P\(([^)]+)\)P\(([^)]+)\).*?P\(([^)]+)\)/,
+            replacement: (match, a, b, c, d, e) => `P(${a}|${b}) = \\frac{P(${b}|${a})P(${a})}{P(${b})}`
+        },
+
+        // General fraction with zero-width space: a​b -> \frac{a}{b}
+        {
+            pattern: /([^​\s]+)​([^​\s]+)/g,
+            replacement: (match, num, den) => `\\frac{${num}}{${den}}`
+        },
+
+        // Uncertainty principle: ℏ​ -> \frac{\hbar}{2}
+        {
+            pattern: /ℏ​/g,
+            replacement: '\\frac{\\hbar}{2}'
+        }
+    ];
+
+    for (const {pattern, replacement} of fractionPatterns) {
+        if (pattern.test(text)) {
+            const result = text.replace(pattern, replacement);
+            if (result !== text) {
+                console.log('✅ Pattern-based fraction reconstruction:', result.substring(0, 50));
+                return result;
+            }
         }
     }
 
     return null;
+}
+
+// Create flexible pattern for fraction replacement
+function createFlexibleFractionPattern(numerator, denominator, fullText) {
+    // Escape special regex characters
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const numEscaped = escapeRegex(numerator);
+    const denEscaped = escapeRegex(denominator);
+
+    // Try different patterns
+    const patterns = [
+        new RegExp(`${numEscaped}.*?${denEscaped}`, 'g'),
+        new RegExp(`${numEscaped}​${denEscaped}`, 'g'), // with zero-width space
+        new RegExp(`${numEscaped}\\s*${denEscaped}`, 'g') // with space
+    ];
+
+    for (const pattern of patterns) {
+        if (pattern.test(fullText)) {
+            return pattern;
+        }
+    }
+
+    return null;
+}
+
+// Clean mathematical text from DOM
+function cleanMathText(text) {
+    if (!text) return '';
+
+    return text
+        .replace(/​/g, '') // Remove zero-width space
+        .replace(/\u200B/g, '') // Remove zero-width space (Unicode)
+        .trim();
+}
+
+// Reconstruct integrals and summations from DOM structure
+function reconstructIntegralsAndSums(element, text) {
+    console.log('🔧 Integral/sum reconstruction for:', text.substring(0, 50));
+
+    let result = text;
+    let hasChanges = false;
+
+    // Method 1: Analyze integral DOM structures
+    const integralElements = element.querySelectorAll('.mop, .integral, .sum');
+    integralElements.forEach(intEl => {
+        const integralSymbol = intEl.textContent.trim();
+
+        if (['∫', '∬', '∭', '∮', '∑', '∏'].includes(integralSymbol)) {
+            // Look for limits (subscripts and superscripts)
+            const limitsContainer = intEl.closest('.mop')?.nextElementSibling;
+            if (limitsContainer) {
+                const subscript = limitsContainer.querySelector('.vlist-r .vlist span[style*="top: -2"]');
+                const superscript = limitsContainer.querySelector('.vlist-r .vlist span[style*="top: -3"]');
+
+                let latexSymbol = MATH_SYMBOL_MAP[integralSymbol] || integralSymbol;
+
+                if (subscript && superscript) {
+                    const subText = cleanMathText(subscript.textContent);
+                    const supText = cleanMathText(superscript.textContent);
+                    latexSymbol = `${latexSymbol}_{${subText}}^{${supText}}`;
+                } else if (subscript) {
+                    const subText = cleanMathText(subscript.textContent);
+                    latexSymbol = `${latexSymbol}_{${subText}}`;
+                }
+
+                // Replace in result
+                const pattern = new RegExp(integralSymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                result = result.replace(pattern, latexSymbol);
+                hasChanges = true;
+            }
+        }
+    });
+
+    // Method 2: Pattern-based integral reconstruction
+    const integralPatterns = [
+        // Double integral: ∬SF⋅dS -> \iint_S F \cdot dS
+        {
+            pattern: /∬([A-Z])([^=]+)=([^=]+)/,
+            replacement: (match, surface, left, right) => `\\iint_{${surface}} ${left} = ${right}`
+        },
+
+        // Triple integral: ∭V(∇⋅F)dV -> \iiint_V (\nabla \cdot F) dV
+        {
+            pattern: /∭([A-Z])\(([^)]+)\)([a-zA-Z]+)/,
+            replacement: (match, volume, expr, diff) => `\\iiint_{${volume}} (${expr}) ${diff}`
+        },
+
+        // Simple integral with limits: \intab​f(x)dx -> \int_a^b f(x) dx
+        {
+            pattern: /\\int([a-zA-Z])([a-zA-Z])​([^=]+)/,
+            replacement: (match, lower, upper, expr) => `\\int_{${lower}}^{${upper}} ${expr}`
+        },
+
+        // Summation: \sumΔHf∘​ -> \sum \Delta H_f^\circ
+        {
+            pattern: /\\sum([A-Z])([A-Z])([a-z])∘​/g,
+            replacement: (match, delta, h, f) => `\\sum \\${delta} ${h}_{${f}}^\\circ`
+        },
+
+        // General summation with subscript: \sum_{...}
+        {
+            pattern: /\\sum([^\\s=]+)/g,
+            replacement: (match, subscript) => `\\sum_{${subscript}}`
+        }
+    ];
+
+    for (const {pattern, replacement} of integralPatterns) {
+        if (pattern.test(result)) {
+            const newResult = result.replace(pattern, replacement);
+            if (newResult !== result) {
+                result = newResult;
+                hasChanges = true;
+                console.log('✅ Applied integral pattern:', pattern.source);
+            }
+        }
+    }
+
+    return hasChanges ? result : null;
 }
 
 // Reconstruct superscripts and subscripts from DOM structure
@@ -1083,26 +1266,213 @@ function reconstructSqrtFromDOM(element, text) {
     return null;
 }
 
-// General mathematical pattern reconstruction
+// Enhanced mathematical symbol mapping (inspired by DeepSeekFormulaCopy)
+const MATH_SYMBOL_MAP = {
+    // Integral symbols
+    '∫': '\\int',
+    '∬': '\\iint',
+    '∭': '\\iiint',
+    '∮': '\\oint',
+
+    // Differential operators
+    '∂': '\\partial',
+    '∇': '\\nabla',
+    '∆': '\\Delta',
+    'Δ': '\\Delta',
+
+    // Vector operations
+    '⋅': '\\cdot',
+    '×': '\\times',
+    '∘': '\\circ',
+
+    // Quantum mechanics
+    'ℏ': '\\hbar',
+    '∣': '|',
+    '⟩': '\\rangle',
+    '⟨': '\\langle',
+
+    // Greek letters (common ones)
+    'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta',
+    'ε': '\\varepsilon', 'ζ': '\\zeta', 'η': '\\eta', 'θ': '\\theta',
+    'ι': '\\iota', 'κ': '\\kappa', 'λ': '\\lambda', 'μ': '\\mu',
+    'ν': '\\nu', 'ξ': '\\xi', 'π': '\\pi', 'ρ': '\\rho',
+    'σ': '\\sigma', 'τ': '\\tau', 'υ': '\\upsilon', 'φ': '\\phi',
+    'χ': '\\chi', 'ψ': '\\psi', 'ω': '\\omega',
+
+    // Capital Greek letters
+    'Γ': '\\Gamma', 'Θ': '\\Theta', 'Λ': '\\Lambda', 'Ξ': '\\Xi',
+    'Π': '\\Pi', 'Σ': '\\Sigma', 'Υ': '\\Upsilon', 'Φ': '\\Phi',
+    'Ψ': '\\Psi', 'Ω': '\\Omega',
+
+    // Mathematical operators
+    '≤': '\\leq', '≥': '\\geq', '≠': '\\neq', '≈': '\\approx',
+    '≡': '\\equiv', '∞': '\\infty', '±': '\\pm', '∓': '\\mp',
+    '∑': '\\sum', '∏': '\\prod', '√': '\\sqrt',
+
+    // Set theory
+    '∈': '\\in', '∉': '\\notin', '⊂': '\\subset', '⊃': '\\supset',
+    '∪': '\\cup', '∩': '\\cap', '∅': '\\emptyset',
+
+    // Logic
+    '∧': '\\land', '∨': '\\lor', '¬': '\\neg', '→': '\\to',
+    '↔': '\\leftrightarrow', '∀': '\\forall', '∃': '\\exists'
+};
+
+// Enhanced mathematical pattern reconstruction with comprehensive symbol support
 function reconstructGeneralMathPattern(text) {
     let result = text;
 
-    // Fix common patterns
-    // 1. Simple superscripts: ax2 -> ax^2
-    result = result.replace(/([a-zA-Z])([0-9]+)(?![a-zA-Z])/g, '$1^{$2}');
+    console.log('🔧 General pattern reconstruction input:', text.substring(0, 100));
 
-    // 2. Simple subscripts with Greek letters: Fn -> F_n
-    result = result.replace(/([A-Z])([a-z])(?![a-zA-Z])/g, '$1_{$2}');
+    // Step 1: Apply mathematical symbol mapping
+    result = applyMathSymbolMapping(result);
 
-    // 3. Conditional probability: ∣ -> |
-    result = result.replace(/∣/g, '|');
+    // Step 2: Fix LaTeX command reconstruction
+    result = reconstructLatexCommands(result);
 
-    // 4. Fix spacing around operators
+    // Step 3: Fix subscripts and superscripts
+    result = reconstructScriptsPattern(result);
+
+    // Step 4: Fix brackets and parentheses
+    result = reconstructBracketsPattern(result);
+
+    // Step 5: Fix spacing and formatting
+    result = normalizeSpacingAndFormatting(result);
+
+    console.log('🔧 General pattern reconstruction output:', result.substring(0, 100));
+
+    return result;
+}
+
+// Apply mathematical symbol mapping
+function applyMathSymbolMapping(text) {
+    let result = text;
+
+    // Apply symbol replacements
+    for (const [symbol, latex] of Object.entries(MATH_SYMBOL_MAP)) {
+        result = result.replaceAll(symbol, latex);
+    }
+
+    return result;
+}
+
+// Enhanced LaTeX command reconstruction with physics support
+function reconstructLatexCommands(text) {
+    let result = text;
+
+    console.log('🔧 LaTeX command reconstruction for:', text.substring(0, 50));
+
+    // Quantum mechanics patterns
+    // Fix Schrödinger equation: iℏ\partialt\partial​∣Ψ(t)⟩ -> i\hbar \frac{\partial}{\partial t} |\Psi(t)\rangle
+    result = result.replace(/i\\hbar\\partial([a-zA-Z])\\partial​∣([A-Z])\(([^)]+)\)⟩/g,
+        'i\\hbar \\frac{\\partial}{\\partial $1} |\\$2($3)\\rangle');
+
+    // Fix Hamiltonian: H^∣Ψ(t)⟩ -> \\hat{H} |\Psi(t)\rangle
+    result = result.replace(/([A-Z])\^∣([A-Z])\(([^)]+)\)⟩/g, '\\hat{$1} |\\$2($3)\\rangle');
+    result = result.replace(/([A-Z])\^∣([A-Z])⟩/g, '\\hat{$1} |\\$2\\rangle');
+
+    // Fix commutators: L^x,L^y]=iℏL^z -> [\\hat{L}_x, \\hat{L}_y] = i\\hbar \\hat{L}_z
+    result = result.replace(/([A-Z])\^([a-z]),([A-Z])\^([a-z])\]=i\\hbar([A-Z])\^([a-z])/g,
+        '[\\hat{$1}_$2, \\hat{$3}_$4] = i\\hbar \\hat{$5}_$6');
+
+    // Fix Dirac equation: iℏ\gamma\mu\partial\mu​−mc)ψ=0 -> i\hbar \gamma^\mu \partial_\mu - mc) \psi = 0
+    result = result.replace(/i\\hbar\\gamma\\([a-zA-Z]+)\\partial\\([a-zA-Z]+)​−([a-z])([a-z])\)([a-z])=0/g,
+        'i\\hbar \\gamma^\\$1 \\partial_\\$2 - $3$4) \\$5 = 0');
+
+    // Fix broken partial derivatives: \partialt\partial​ -> \partial_t
+    result = result.replace(/\\partial([a-zA-Z])\\partial​/g, '\\partial_$1');
+    result = result.replace(/\\partial([a-zA-Z])\\partial/g, '\\partial_$1');
+
+    // Fix broken integrals: \intab​ -> \int_a^b
+    result = result.replace(/\\int([a-zA-Z])([a-zA-Z])​/g, '\\int_$1^$2');
+    result = result.replace(/\\int([a-zA-Z])([a-zA-Z])/g, '\\int_$1^$2');
+
+    // Fix broken times: v\timesB -> v \\times B
+    result = result.replace(/\\times([A-Z])/g, ' \\times $1');
+    result = result.replace(/([a-z])\\times([A-Z])/g, '$1 \\times $2');
+
+    // Fix broken gamma matrices: \gamma\mu -> \gamma^\mu
+    result = result.replace(/\\gamma\\([a-zA-Z]+)/g, '\\gamma^\\$1');
+
+    // Fix broken partial: \partial\mu​ -> \partial_\mu
+    result = result.replace(/\\partial\\([a-zA-Z]+)​/g, '\\partial_\\$1');
+    result = result.replace(/\\partial\\([a-zA-Z]+)/g, '\\partial_\\$1');
+
+    // Fix gravitational force: Gr2m1m_{2} -> G \frac{m_1 m_2}{r^2}
+    result = result.replace(/([A-Z])([a-z])([0-9]+)([a-z])([0-9]+)([a-z])_\{([0-9]+)\}/g,
+        '$1 \\frac{$4_$5 $6_{$7}}{$2^$3}');
+
+    // Fix Arrhenius equation: k=Ae−RTE_{a} -> k = A e^{-E_a/RT}
+    result = result.replace(/([a-z])=([A-Z])e−([A-Z])([A-Z])([A-Z])_\{([a-z])\}/g,
+        '$1 = $2 e^{-$5_{$6}/$3$4}');
+
+    // Fix percent composition: mass of compoundmass of element​ -> \frac{\text{mass of element}}{\text{mass of compound}}
+    result = result.replace(/mass of compound([a-z\s]+)​/g, '\\frac{\\text{$1}}{\\text{mass of compound}}');
+
+    console.log('🔧 LaTeX command reconstruction result:', result.substring(0, 50));
+
+    return result;
+}
+
+// Enhanced subscript and superscript reconstruction
+function reconstructScriptsPattern(text) {
+    let result = text;
+
+    // Fix subscripts with zero-width space: m_{2} pattern
+    result = result.replace(/([a-zA-Z])([0-9]+)_{([0-9]+)}/g, '$1_$2$3');
+    result = result.replace(/([a-zA-Z])([a-zA-Z])​/g, '$1_{$2}');
+
+    // Fix superscripts: x2 -> x^2 (but be careful with existing LaTeX)
+    result = result.replace(/([a-zA-Z])([0-9]+)(?![a-zA-Z}])/g, '$1^{$2}');
+
+    // Fix subscripts: Fn -> F_n (capital letter followed by lowercase)
+    result = result.replace(/([A-Z])([a-z])(?![a-zA-Z}])/g, '$1_{$2}');
+
+    // Fix chemical subscripts: H2O -> H_2O
+    result = result.replace(/([A-Z])([0-9]+)([A-Z])/g, '$1_{$2}$3');
+
+    return result;
+}
+
+// Fix brackets and parentheses patterns
+function reconstructBracketsPattern(text) {
+    let result = text;
+
+    // Fix incomplete LaTeX commands with missing closing braces
+    // Pattern: \sum...( -> \sum_{...}
+    result = result.replace(/\\sum([^{\\]+)\(/g, '\\sum_{$1}(');
+
+    // Fix incomplete fractions: F(b)−F(a -> F(b) - F(a)
+    result = result.replace(/\)−/g, ') - ');
+    result = result.replace(/\)−([A-Z])/g, ') - $1');
+
+    // Fix incomplete parentheses in LaTeX commands
+    result = result.replace(/([a-zA-Z])\(/g, '$1 (');
+
+    // Fix quantum mechanics brackets: ∣Ψ⟩ -> |\\Psi\\rangle
+    result = result.replace(/∣([A-Z])⟩/g, '|\\$1\\rangle');
+    result = result.replace(/⟨([A-Z])∣/g, '\\langle\\$1|');
+
+    return result;
+}
+
+// Normalize spacing and formatting
+function normalizeSpacingAndFormatting(text) {
+    let result = text;
+
+    // Fix spacing around operators
     result = result.replace(/([a-zA-Z0-9}])([=+\-])/g, '$1 $2 ');
-    result = result.replace(/([=+\-])([a-zA-Z0-9{])/g, '$1 $2');
+    result = result.replace(/([=+\-])([a-zA-Z0-9{\\])/g, '$1 $2');
 
-    // 5. Clean up multiple spaces
+    // Fix spacing around times and cdot
+    result = result.replace(/([a-zA-Z0-9}])(\\times|\\cdot)/g, '$1 $2 ');
+    result = result.replace(/(\\times|\\cdot)([a-zA-Z0-9{\\])/g, '$1 $2');
+
+    // Clean up multiple spaces
     result = result.replace(/\s+/g, ' ').trim();
+
+    // Remove zero-width characters
+    result = result.replace(/​/g, '').replace(/\u200B/g, '');
 
     return result;
 }
