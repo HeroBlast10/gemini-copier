@@ -32,11 +32,35 @@ function extractLatexFromElement(element) {
     console.log('📝 Element HTML:', element.outerHTML.substring(0, 200));
     console.log('📄 Element text:', element.textContent?.substring(0, 100));
 
-    // Case 1: Direct data attributes (DeepSeekFormulaCopy approach)
-    if (element.hasAttribute('data-latex')) {
-        const latex = element.getAttribute('data-latex');
-        console.log('✅ Found data-latex:', latex);
-        return cleanLatexOutput(latex);
+    // Case 1: KaTeX data attributes (Gemini-specific approach)
+    // Check for various data attributes that might contain original LaTeX
+    const katexDataAttrs = [
+        'data-latex', 'data-expr', 'data-katex', 'data-original',
+        'data-tex', 'data-formula', 'data-math', 'data-source'
+    ];
+
+    for (const attr of katexDataAttrs) {
+        if (element.hasAttribute(attr)) {
+            const latex = element.getAttribute(attr);
+            if (latex && latex.trim()) {
+                console.log(`✅ Found ${attr}:`, latex);
+                return cleanLatexOutput(latex);
+            }
+        }
+    }
+
+    // Check parent KaTeX container for data attributes
+    const katexParent = element.closest('.katex');
+    if (katexParent) {
+        for (const attr of katexDataAttrs) {
+            if (katexParent.hasAttribute(attr)) {
+                const latex = katexParent.getAttribute(attr);
+                if (latex && latex.trim()) {
+                    console.log(`✅ Found ${attr} in KaTeX parent:`, latex);
+                    return cleanLatexOutput(latex);
+                }
+            }
+        }
     }
 
     // Case 2: KaTeX annotation elements (DeepSeekFormulaCopy core method)
@@ -301,6 +325,14 @@ function extractPlatformSpecificLatex(element) {
 
     // Gemini-specific LaTeX extraction (special handling for KaTeX without annotation)
     if (hostname.includes('gemini.google.com')) {
+        // Priority 1: Search for KaTeX data attributes in the element tree
+        const katexLatex = extractKatexDataAttributes(element);
+        if (katexLatex) {
+            console.log('✅ Found KaTeX data attribute:', katexLatex);
+            return katexLatex;
+        }
+
+        // Priority 2: Fallback to text-based extraction
         const text = element.textContent || '';
         return extractGeminiLatex(element, text);
     }
@@ -737,6 +769,85 @@ function geminiLatexFallback(element) {
     return null;
 }
 
+// Extract KaTeX data attributes - Gemini-specific approach
+function extractKatexDataAttributes(element) {
+    console.log('🔍 Searching for KaTeX data attributes...');
+
+    // Define all possible KaTeX data attribute names
+    const katexDataAttrs = [
+        'data-latex', 'data-expr', 'data-katex', 'data-original',
+        'data-tex', 'data-formula', 'data-math', 'data-source',
+        'data-katex-source', 'data-math-content', 'data-raw'
+    ];
+
+    // Search in current element
+    for (const attr of katexDataAttrs) {
+        if (element.hasAttribute(attr)) {
+            const value = element.getAttribute(attr);
+            if (value && value.trim()) {
+                console.log(`✅ Found ${attr} in current element:`, value);
+                return value.trim();
+            }
+        }
+    }
+
+    // Search in KaTeX container (.katex)
+    const katexContainer = element.closest('.katex');
+    if (katexContainer) {
+        console.log('🔍 Searching in KaTeX container...');
+        for (const attr of katexDataAttrs) {
+            if (katexContainer.hasAttribute(attr)) {
+                const value = katexContainer.getAttribute(attr);
+                if (value && value.trim()) {
+                    console.log(`✅ Found ${attr} in KaTeX container:`, value);
+                    return value.trim();
+                }
+            }
+        }
+    }
+
+    // Search in math containers (.math-inline, .math-block)
+    const mathContainer = element.closest('.math-inline, .math-block, .math');
+    if (mathContainer) {
+        console.log('🔍 Searching in math container...');
+        for (const attr of katexDataAttrs) {
+            if (mathContainer.hasAttribute(attr)) {
+                const value = mathContainer.getAttribute(attr);
+                if (value && value.trim()) {
+                    console.log(`✅ Found ${attr} in math container:`, value);
+                    return value.trim();
+                }
+            }
+        }
+    }
+
+    // Search in all child elements with KaTeX-related classes
+    const katexElements = element.querySelectorAll('.katex, .katex-mathml, .katex-html, .math-inline, .math-block');
+    for (const katexEl of katexElements) {
+        for (const attr of katexDataAttrs) {
+            if (katexEl.hasAttribute(attr)) {
+                const value = katexEl.getAttribute(attr);
+                if (value && value.trim()) {
+                    console.log(`✅ Found ${attr} in child KaTeX element:`, value);
+                    return value.trim();
+                }
+            }
+        }
+    }
+
+    // Check for JavaScript-attached data (KaTeX might store data in element properties)
+    if (element.__katex || element._katex) {
+        const katexData = element.__katex || element._katex;
+        if (katexData && katexData.source) {
+            console.log('✅ Found KaTeX JavaScript data:', katexData.source);
+            return katexData.source;
+        }
+    }
+
+    console.log('❌ No KaTeX data attributes found');
+    return null;
+}
+
 // Gemini-specific extraction - DeepSeekFormulaCopy inspired approach
 function extractGeminiLatex(element, text) {
     // 安全检查text参数
@@ -752,7 +863,14 @@ function extractGeminiLatex(element, text) {
         return latexSource;
     }
 
-    // Method 2: Simple text-based LaTeX detection (inspired by DeepSeekFormulaCopy simplicity)
+    // Method 2: KaTeX HTML to LaTeX reverse engineering
+    const reversedLatex = reverseEngineerKatexHtml(element);
+    if (reversedLatex) {
+        console.log('✅ Reverse engineered LaTeX from KaTeX HTML:', reversedLatex);
+        return reversedLatex;
+    }
+
+    // Method 3: Simple text-based LaTeX detection (inspired by DeepSeekFormulaCopy simplicity)
     const simpleLatex = detectSimpleLatexPatterns(text);
     if (simpleLatex) {
         console.log('✅ Detected simple LaTeX pattern:', simpleLatex);
@@ -847,6 +965,201 @@ function detectSimpleLatexPatterns(text) {
     // Only return if we made meaningful changes
     if (result !== cleanText && result.length > 0) {
         return result;
+    }
+
+    return null;
+}
+
+// Reverse engineer LaTeX from KaTeX HTML structure
+function reverseEngineerKatexHtml(element) {
+    console.log('🔧 Reverse engineering KaTeX HTML...');
+
+    // Check if this is a KaTeX element
+    if (!element.classList.contains('katex') && !element.querySelector('.katex')) {
+        return null;
+    }
+
+    try {
+        // Method 1: Extract from KaTeX HTML structure
+        const katexHtml = element.querySelector('.katex-html');
+        if (katexHtml) {
+            const latex = extractLatexFromKatexHtml(katexHtml);
+            if (latex) {
+                console.log('✅ Extracted from KaTeX HTML structure:', latex);
+                return latex;
+            }
+        }
+
+        // Method 2: Extract from MathML if available
+        const mathml = element.querySelector('.katex-mathml math');
+        if (mathml) {
+            const latex = extractLatexFromMathML(mathml);
+            if (latex) {
+                console.log('✅ Extracted from MathML:', latex);
+                return latex;
+            }
+        }
+
+        // Method 3: Pattern-based extraction from rendered text
+        const text = element.textContent || '';
+        if (text) {
+            const latex = extractLatexFromRenderedText(text);
+            if (latex) {
+                console.log('✅ Extracted from rendered text:', latex);
+                return latex;
+            }
+        }
+
+    } catch (error) {
+        console.log('❌ Error in reverse engineering:', error);
+    }
+
+    return null;
+}
+
+// Extract LaTeX from KaTeX HTML structure
+function extractLatexFromKatexHtml(katexHtml) {
+    let latex = '';
+
+    // Look for fractions
+    const fractions = katexHtml.querySelectorAll('.mfrac');
+    if (fractions.length > 0) {
+        // This is likely a fraction, try to reconstruct it
+        for (const frac of fractions) {
+            const numerator = frac.querySelector('.vlist-r .vlist span:first-child .mord');
+            const denominator = frac.querySelector('.vlist-r .vlist span:last-child .mord');
+
+            if (numerator && denominator) {
+                const num = numerator.textContent?.trim();
+                const den = denominator.textContent?.trim();
+                if (num && den) {
+                    latex += `\\frac{${num}}{${den}}`;
+                }
+            }
+        }
+    }
+
+    // Look for superscripts and subscripts
+    const scripts = katexHtml.querySelectorAll('.msupsub');
+    for (const script of scripts) {
+        const base = script.previousElementSibling?.textContent?.trim();
+        const sup = script.querySelector('.vlist-r .vlist span:first-child')?.textContent?.trim();
+        const sub = script.querySelector('.vlist-r .vlist span:last-child')?.textContent?.trim();
+
+        if (base) {
+            if (sup) latex += `${base}^{${sup}}`;
+            if (sub) latex += `${base}_{${sub}}`;
+        }
+    }
+
+    // Look for square roots
+    const sqrts = katexHtml.querySelectorAll('.sqrt');
+    for (const sqrt of sqrts) {
+        const content = sqrt.querySelector('.mord')?.textContent?.trim();
+        if (content) {
+            latex += `\\sqrt{${content}}`;
+        }
+    }
+
+    return latex || null;
+}
+
+// Extract LaTeX from MathML
+function extractLatexFromMathML(mathml) {
+    // Basic MathML to LaTeX conversion
+    let latex = '';
+
+    // Handle fractions
+    const fractions = mathml.querySelectorAll('mfrac');
+    for (const frac of fractions) {
+        const num = frac.children[0]?.textContent?.trim();
+        const den = frac.children[1]?.textContent?.trim();
+        if (num && den) {
+            latex += `\\frac{${num}}{${den}}`;
+        }
+    }
+
+    // Handle superscripts
+    const sups = mathml.querySelectorAll('msup');
+    for (const sup of sups) {
+        const base = sup.children[0]?.textContent?.trim();
+        const exp = sup.children[1]?.textContent?.trim();
+        if (base && exp) {
+            latex += `${base}^{${exp}}`;
+        }
+    }
+
+    // Handle subscripts
+    const subs = mathml.querySelectorAll('msub');
+    for (const sub of subs) {
+        const base = sub.children[0]?.textContent?.trim();
+        const index = sub.children[1]?.textContent?.trim();
+        if (base && index) {
+            latex += `${base}_{${index}}`;
+        }
+    }
+
+    // Handle square roots
+    const sqrts = mathml.querySelectorAll('msqrt');
+    for (const sqrt of sqrts) {
+        const content = sqrt.textContent?.trim();
+        if (content) {
+            latex += `\\sqrt{${content}}`;
+        }
+    }
+
+    return latex || null;
+}
+
+// Extract LaTeX from rendered text using pattern recognition
+function extractLatexFromRenderedText(text) {
+    // This is a simplified approach - look for mathematical patterns in the text
+    // and try to convert them back to LaTeX
+
+    // Clean the text
+    let cleanText = text.replace(/​/g, '').replace(/\u200B/g, '').trim();
+
+    // Pattern for fractions (look for patterns like "a/b" or "numerator over denominator")
+    if (cleanText.includes('/')) {
+        // Simple fraction pattern
+        cleanText = cleanText.replace(/([^\/\s]+)\/([^\/\s]+)/g, '\\frac{$1}{$2}');
+    }
+
+    // Pattern for superscripts (look for patterns like "x²" or "x^2")
+    cleanText = cleanText.replace(/([a-zA-Z])([²³⁴⁵⁶⁷⁸⁹⁰¹])/g, (match, base, sup) => {
+        const supMap = {'²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁰': '0', '¹': '1'};
+        return `${base}^{${supMap[sup] || sup}}`;
+    });
+
+    // Pattern for common mathematical symbols
+    cleanText = cleanText.replace(/≥/g, '\\geq');
+    cleanText = cleanText.replace(/≤/g, '\\leq');
+    cleanText = cleanText.replace(/∞/g, '\\infty');
+    cleanText = cleanText.replace(/∑/g, '\\sum');
+    cleanText = cleanText.replace(/∫/g, '\\int');
+    cleanText = cleanText.replace(/√/g, '\\sqrt');
+    cleanText = cleanText.replace(/π/g, '\\pi');
+    cleanText = cleanText.replace(/α/g, '\\alpha');
+    cleanText = cleanText.replace(/β/g, '\\beta');
+    cleanText = cleanText.replace(/γ/g, '\\gamma');
+    cleanText = cleanText.replace(/δ/g, '\\delta');
+    cleanText = cleanText.replace(/ε/g, '\\epsilon');
+    cleanText = cleanText.replace(/θ/g, '\\theta');
+    cleanText = cleanText.replace(/λ/g, '\\lambda');
+    cleanText = cleanText.replace(/μ/g, '\\mu');
+    cleanText = cleanText.replace(/σ/g, '\\sigma');
+    cleanText = cleanText.replace(/φ/g, '\\phi');
+    cleanText = cleanText.replace(/ψ/g, '\\psi');
+    cleanText = cleanText.replace(/ω/g, '\\omega');
+    cleanText = cleanText.replace(/Δ/g, '\\Delta');
+    cleanText = cleanText.replace(/Φ/g, '\\Phi');
+    cleanText = cleanText.replace(/Ψ/g, '\\Psi');
+    cleanText = cleanText.replace(/Ω/g, '\\Omega');
+    cleanText = cleanText.replace(/ℏ/g, '\\hbar');
+
+    // Only return if we made meaningful changes
+    if (cleanText !== text && cleanText.includes('\\')) {
+        return cleanText;
     }
 
     return null;
