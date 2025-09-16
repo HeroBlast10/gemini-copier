@@ -2042,11 +2042,19 @@ function addCopyFunctionalityToMath() {
 
     // Platform-specific selectors (precise targeting like DeepSeekFormulaCopy)
     if (hostname.includes('gemini.google.com')) {
-        // Gemini-specific selectors based on HTML structure analysis
+        // Gemini-specific selectors - comprehensive but browser-compatible
         mathSelectors = [
-            '.math-inline', '.math-block',  // Gemini's math containers
-            '.katex', '.katex-html',        // KaTeX elements
-            '.katex-display'                // Display math
+            // Primary Gemini math containers
+            '.math-inline', '.math-block', '.math-display',
+            // KaTeX elements (all variants)
+            '.katex', '.katex-html', '.katex-display', '.katex-mathml',
+            // Gemini's specific math rendering elements
+            'span[data-math-processed]', 'div[data-math-processed]',
+            // Common math container patterns in Gemini
+            'span[class*="math"]', 'div[class*="math"]',
+            'span[class*="katex"]', 'div[class*="katex"]',
+            // Generic containers that commonly contain math in Gemini
+            'p', 'li', 'td', 'span', 'div'
         ];
     } else if (hostname.includes('chat.deepseek.com')) {
         // DeepSeek selectors (from DeepSeekFormulaCopy)
@@ -2090,15 +2098,20 @@ function addCopyFunctionalityToMath() {
 
     // For Gemini, we need special handling since it doesn't have annotation elements
     if (hostname.includes('gemini.google.com')) {
-        // Process all Gemini math elements
+        // First, process standard math elements
         mathElements.forEach((element, index) => {
             if (!element.dataset.mathProcessed && isSuitableForProcessing(element)) {
-                console.log(`✅ Processing Gemini math element ${index + 1}:`, element);
-                console.log(`📝 Element text: "${element.textContent?.substring(0, 100)}"`);
-                element.dataset.mathProcessed = 'true';
-                addDoubleClickHandler(element);
+                if (hasGeminiMathContent(element)) {
+                    console.log(`✅ Processing Gemini math element ${index + 1}:`, element);
+                    console.log(`📝 Element text: "${element.textContent?.substring(0, 100)}"`);
+                    element.dataset.mathProcessed = 'true';
+                    addDoubleClickHandler(element);
+                }
             }
         });
+
+        // Additional scan for mathematical content that might be missed
+        scanForGeminiMathContent();
     } else {
         // For other platforms, filter elements that actually contain LaTeX sources
         const validMathElements = mathElements.filter(element => {
@@ -2123,6 +2136,85 @@ function addCopyFunctionalityToMath() {
             scanForMathematicalContent();
         }
     }
+}
+
+// Check if element contains Gemini mathematical content
+function hasGeminiMathContent(element) {
+    const text = element.textContent || '';
+
+    // Check for KaTeX classes
+    if (element.classList.contains('katex') || element.classList.contains('math-inline') ||
+        element.classList.contains('math-block') || element.querySelector('.katex')) {
+        return true;
+    }
+
+    // Check for mathematical symbols and patterns
+    const mathSymbols = [
+        // Greek letters
+        'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω',
+        'Α', 'Β', 'Γ', 'Δ', 'Ε', 'Ζ', 'Η', 'Θ', 'Ι', 'Κ', 'Λ', 'Μ', 'Ν', 'Ξ', 'Ο', 'Π', 'Ρ', 'Σ', 'Τ', 'Υ', 'Φ', 'Χ', 'Ψ', 'Ω',
+        // Mathematical operators
+        '∑', '∫', '∬', '∭', '∮', '∏', '√', '∞', '≥', '≤', '≠', '±', '∓', '×', '÷', '∂', '∇', '∆',
+        // Special symbols
+        'ℏ', '∈', '∉', '⊂', '⊃', '∪', '∩', '∅', '∀', '∃', '¬', '∧', '∨', '→', '↔', '⇒', '⇔',
+        // Fractions and powers (common patterns)
+        '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹', '⁰', '¹', '₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'
+    ];
+
+    // Check if text contains mathematical symbols
+    const hasMathSymbols = mathSymbols.some(symbol => text.includes(symbol));
+
+    // Check for mathematical patterns
+    const mathPatterns = [
+        /[a-zA-Z]\s*=\s*[^=]/,  // Variable assignments like "x = 5"
+        /\b\d+\s*[+\-*/]\s*\d+/,  // Basic arithmetic
+        /\([^)]*\)\s*[+\-*/=]/,  // Expressions with parentheses
+        /[a-zA-Z]_\{[^}]+\}/,  // Subscripts
+        /[a-zA-Z]\^\{[^}]+\}/,  // Superscripts
+        /\\[a-zA-Z]+/,  // LaTeX commands
+        /\b(sin|cos|tan|log|ln|exp|sqrt|lim|int|sum|prod)\b/i,  // Mathematical functions
+        /\b[A-Z]\([^)]*\)/,  // Function notation like F(x)
+        /\d+!\s*[+\-*/=]/,  // Factorials
+        /[a-zA-Z]\s*[+\-]\s*[a-zA-Z]/  // Variable operations
+    ];
+
+    const hasMathPatterns = mathPatterns.some(pattern => pattern.test(text));
+
+    // Additional check for complex mathematical expressions
+    const complexMathIndicators = [
+        'Black-Scholes', 'Taylor', 'Fibonacci', 'Bayes', 'Schrödinger', 'Heisenberg',
+        'sin(x)', 'cos(x)', 'e^x', 'ln(', 'log(', 'sqrt(', 'integral', 'derivative',
+        'matrix', 'vector', 'probability', 'statistics', 'calculus', 'algebra'
+    ];
+
+    const hasComplexMath = complexMathIndicators.some(indicator =>
+        text.toLowerCase().includes(indicator.toLowerCase())
+    );
+
+    return hasMathSymbols || hasMathPatterns || hasComplexMath;
+}
+
+// Scan for Gemini mathematical content that might be missed by standard selectors
+function scanForGeminiMathContent() {
+    console.log('🔍 Scanning for additional Gemini mathematical content...');
+
+    // Get all text-containing elements
+    const allElements = document.querySelectorAll('p, span, div, li, td, th');
+    let processedCount = 0;
+
+    allElements.forEach(element => {
+        if (!element.dataset.mathProcessed && isSuitableForProcessing(element)) {
+            if (hasGeminiMathContent(element)) {
+                console.log(`🎯 Found additional Gemini math content:`, element);
+                console.log(`📝 Text: "${element.textContent?.substring(0, 100)}"`);
+                element.dataset.mathProcessed = 'true';
+                addDoubleClickHandler(element);
+                processedCount++;
+            }
+        }
+    });
+
+    console.log(`✅ Additional Gemini scan completed: ${processedCount} elements processed`);
 }
 
 // Check if element has LaTeX source (DeepSeekFormulaCopy approach)
@@ -2422,37 +2514,96 @@ let cachedMessage = null;
 function showCopyMessage(message, isSuccess) {
     if (!cachedMessage) {
         cachedMessage = document.createElement('div');
+
+        // Modern, tech-inspired styling
         cachedMessage.style.position = 'fixed';
-        cachedMessage.style.top = '20px';
+        cachedMessage.style.top = '24px';
         cachedMessage.style.left = '50%';
         cachedMessage.style.transform = 'translateX(-50%)';
-        cachedMessage.style.padding = '12px 20px';
+        cachedMessage.style.padding = '16px 24px';
         cachedMessage.style.zIndex = '2147483647';
-        cachedMessage.style.borderRadius = '8px';
-        cachedMessage.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+
+        // Modern design with gradient and glass effect
+        cachedMessage.style.borderRadius = '12px';
+        cachedMessage.style.backdropFilter = 'blur(10px)';
+        cachedMessage.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        cachedMessage.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2)';
+
+        // Typography
         cachedMessage.style.fontSize = '14px';
-        cachedMessage.style.fontFamily = 'Arial, sans-serif';
-        cachedMessage.style.maxWidth = '400px';
+        cachedMessage.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+        cachedMessage.style.fontWeight = '500';
+        cachedMessage.style.letterSpacing = '0.5px';
+
+        // Layout
+        cachedMessage.style.maxWidth = '420px';
         cachedMessage.style.wordBreak = 'break-word';
+        cachedMessage.style.textAlign = 'center';
+
+        // Animation
+        cachedMessage.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        cachedMessage.style.opacity = '0';
+        cachedMessage.style.transform = 'translateX(-50%) translateY(-10px) scale(0.95)';
+
         document.body.appendChild(cachedMessage);
     }
 
-    cachedMessage.textContent = message;
-    cachedMessage.style.backgroundColor = isSuccess ? '#4CAF50' : '#f44336';
-    cachedMessage.style.color = 'white';
+    // Update content and styling based on success/failure
+    if (isSuccess) {
+        cachedMessage.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;">
+                    <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>${message}</span>
+            </div>
+        `;
+        // Success gradient: modern green with subtle blue tint
+        cachedMessage.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        cachedMessage.style.color = '#ffffff';
+    } else {
+        cachedMessage.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+                    <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>${message}</span>
+            </div>
+        `;
+        // Error gradient: modern red with subtle orange tint
+        cachedMessage.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        cachedMessage.style.color = '#ffffff';
+    }
+
+    // Show with animation
     cachedMessage.style.display = 'block';
+    requestAnimationFrame(() => {
+        cachedMessage.style.opacity = '1';
+        cachedMessage.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+    });
 
     // Clear previous timeout
     if (cachedMessage.timeoutId) {
         clearTimeout(cachedMessage.timeoutId);
     }
 
-    // Auto-hide after 3 seconds
+    // Auto-hide with fade out animation
     cachedMessage.timeoutId = setTimeout(() => {
         if (cachedMessage && cachedMessage.parentNode) {
-            cachedMessage.style.display = 'none';
+            cachedMessage.style.opacity = '0';
+            cachedMessage.style.transform = 'translateX(-50%) translateY(-10px) scale(0.95)';
+
+            // Remove from DOM after animation
+            setTimeout(() => {
+                if (cachedMessage && cachedMessage.parentNode) {
+                    cachedMessage.style.display = 'none';
+                }
+            }, 300);
         }
-    }, 3000);
+    }, 2500); // Slightly shorter display time for better UX
 }
 
 // Debounce function for performance optimization (from DeepSeekFormulaCopy)
